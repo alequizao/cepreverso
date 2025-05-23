@@ -40,7 +40,7 @@ const MapDisplay = dynamic(() => import('./MapDisplay'), {
 
 const formSchema = z.object({
   destinationCity: z.string().min(1, { message: "Selecione a cidade de destino." }),
-  purchaseValue: z.coerce 
+  purchaseValue: z.coerce
     .number({ invalid_type_error: "Valor da compra deve ser um número." })
     .positive({ message: "Valor da compra deve ser positivo." })
     .min(0.01, { message: "Valor da compra deve ser maior que zero." }),
@@ -63,22 +63,26 @@ export default function ShippingCalculatorForm() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       destinationCity: "",
-      purchaseValue: undefined, 
+      purchaseValue: undefined,
     },
   });
 
   async function onSubmit(values: FormData) {
     setIsLoading(true);
-    setResults(null); 
-    setDestinationMapCoords(undefined); // Clear previous map destination
-    setSelectedDestCityName(undefined);
+    setResults(null);
+    // Do not clear destinationMapCoords here if you want the map to persist the last successful route
+    // until a new one is calculated or form changes significantly.
+    // For this fix, we'll let MapDisplay handle showing default or last state.
+    // setDestinationMapCoords(undefined);
+    // setSelectedDestCityName(undefined);
+
 
     const calculationInput: ShippingCalculationInput = {
       destinationCity: values.destinationCity,
       purchaseValue: values.purchaseValue,
     };
 
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise(resolve => setTimeout(resolve, 300)); // Simulate API call
 
     const output = calculateShipping(calculationInput);
 
@@ -89,17 +93,45 @@ export default function ShippingCalculatorForm() {
         description: output.error,
       });
       setResults(null);
+      // Clear destination map coords on error to reset map if needed
+      setDestinationMapCoords(undefined);
+      setSelectedDestCityName(undefined);
     } else {
       setResults(output);
       if (output.originCoords && output.destinationCoords) {
-        setOriginMapCoords(output.originCoords);
+        setOriginMapCoords(output.originCoords); // Should be static Rio Largo
         setDestinationMapCoords(output.destinationCoords);
         setSelectedDestCityName(output.destinationCityName);
+      } else {
+        // If calculation is successful but somehow no coords, clear map
+        setDestinationMapCoords(undefined);
+        setSelectedDestCityName(undefined);
       }
     }
 
     setIsLoading(false);
   }
+
+  // Update map destination when the select input changes, before submission
+  const handleDestinationChange = (selectedCityName: string) => {
+    form.setValue('destinationCity', selectedCityName); // Update form state
+    const cityData = destinationCities.find(city => city === selectedCityName);
+    if (cityData) { // cityData is just the name, we need coords from shipping-data
+        const coords = calculateShipping({destinationCity: selectedCityName, purchaseValue: 0 /* dummy value */}).destinationCoords;
+        if (coords) {
+             setDestinationMapCoords(coords);
+             setSelectedDestCityName(selectedCityName);
+        } else {
+            setDestinationMapCoords(undefined);
+            setSelectedDestCityName(undefined);
+        }
+    } else {
+        setDestinationMapCoords(undefined);
+        setSelectedDestCityName(undefined);
+    }
+    setResults(null); // Clear previous calculation results
+  };
+
 
   return (
     <>
@@ -125,14 +157,11 @@ export default function ShippingCalculatorForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Destino</FormLabel>
-                    <Select 
+                    <Select
                       onValueChange={(value) => {
-                        field.onChange(value);
-                        // Ao mudar o destino, limpamos os resultados e o mapa anterior
-                        setResults(null);
-                        setDestinationMapCoords(undefined);
-                        setSelectedDestCityName(undefined);
-                      }} 
+                        // field.onChange(value); // This is handled by handleDestinationChange
+                        handleDestinationChange(value);
+                      }}
                       defaultValue={field.value}
                     >
                       <FormControl>
@@ -210,17 +239,16 @@ export default function ShippingCalculatorForm() {
           </CardContent>
         </Card>
       )}
-      
-      {/* Renderiza o mapa se houver coordenadas de destino */}
-      {(destinationMapCoords || !form.formState.isValid && !form.formState.isSubmitted) && (
-        <MapDisplay 
-            originCoords={originMapCoords} 
-            destinationCoords={destinationMapCoords} 
-            originCityName={originCity}
-            destinationCityName={selectedDestCityName}
-        />
-      )}
-      
+
+      {/* Always render MapDisplay; it will handle its internal state. */}
+      <MapDisplay
+          originCoords={originMapCoords}
+          destinationCoords={destinationMapCoords}
+          originCityName={originCity}
+          destinationCityName={selectedDestCityName}
+      />
+
     </>
   );
 }
+
