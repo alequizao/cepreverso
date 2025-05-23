@@ -28,7 +28,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Loader2, Truck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-import { originCity, destinationCities, rioLargoCoordinates, type CityCoordinates } from "@/lib/shipping-data";
+import { originCity, destinationCities, vltOriginCoordinates, type CityCoordinates } from "@/lib/shipping-data";
 import { calculateShipping, type ShippingCalculationInput, type ShippingCalculationOutput } from "@/lib/shipping-calculator";
 
 const MapDisplay = dynamic(() => import('./MapDisplay'), {
@@ -65,7 +65,8 @@ export default function ShippingCalculatorForm() {
   const [results, setResults] = React.useState<ShippingCalculationOutput | null>(null);
   const { toast } = useToast();
 
-  const [originMapCoords, setOriginMapCoords] = React.useState<CityCoordinates | undefined>(rioLargoCoordinates);
+  // Coordenadas da VLT Material de Construção são agora a origem padrão.
+  const [originMapCoords, setOriginMapCoords] = React.useState<CityCoordinates | undefined>(vltOriginCoordinates);
   const [destinationMapCoords, setDestinationMapCoords] = React.useState<CityCoordinates | undefined>(undefined);
   const [selectedDestCityName, setSelectedDestCityName] = React.useState<string | undefined>(undefined);
 
@@ -80,7 +81,6 @@ export default function ShippingCalculatorForm() {
 
   async function onSubmit(values: FormData) {
     setIsLoading(true);
-    // Clear previous results, but keep map coords for immediate feedback
     setResults(null); 
 
     const calculationInput: ShippingCalculationInput = {
@@ -88,7 +88,6 @@ export default function ShippingCalculatorForm() {
       purchaseValue: values.purchaseValue,
     };
 
-    // Simulate API call or complex calculation
     await new Promise(resolve => setTimeout(resolve, 300)); 
 
     const output = calculateShipping(calculationInput);
@@ -100,14 +99,10 @@ export default function ShippingCalculatorForm() {
         description: output.error,
       });
       setResults(null);
-      // Optionally reset destination map coords on error, or keep them to show the problematic selection
-      // setDestinationMapCoords(undefined); 
-      // setSelectedDestCityName(undefined);
     } else {
       setResults(output);
-      // Ensure map coordinates are updated based on the calculation output
-      // (though handleDestinationChange already does this for the selected city)
-      if (output.originCoords) setOriginMapCoords(output.originCoords);
+      // Assegurar que coordenadas do mapa sejam atualizadas com base no resultado
+      if (output.originCoords) setOriginMapCoords(output.originCoords); // Deve ser sempre VLT coords
       if (output.destinationCoords) setDestinationMapCoords(output.destinationCoords);
       if (output.destinationCityName) setSelectedDestCityName(output.destinationCityName);
     }
@@ -115,22 +110,21 @@ export default function ShippingCalculatorForm() {
     setIsLoading(false);
   }
 
-  const handleDestinationChange = (selectedCity: string) => {
-    form.setValue('destinationCity', selectedCity, { shouldValidate: true }); 
+  const handleDestinationChange = (selectedCityValue: string) => {
+    form.setValue('destinationCity', selectedCityValue, { shouldValidate: true }); 
     
-    // Attempt to get coordinates for the selected city for map preview
-    // We use a dummy purchaseValue here as it's not needed for coordinate lookup
-    const previewData = calculateShipping({ destinationCity: selectedCity, purchaseValue: 1 }); 
+    const previewData = calculateShipping({ destinationCity: selectedCityValue, purchaseValue: 1 }); 
 
     if (previewData.destinationCoords && previewData.destinationCityName) {
         setDestinationMapCoords(previewData.destinationCoords);
         setSelectedDestCityName(previewData.destinationCityName);
     } else {
-        // If city is not found or has no coords, clear destination from map
         setDestinationMapCoords(undefined);
         setSelectedDestCityName(undefined);
     }
-    setResults(null); // Clear previous calculation results when destination changes
+     // Atualiza as coordenadas de origem para VLT (pode ser redundante se já setado, mas garante)
+    setOriginMapCoords(vltOriginCoordinates);
+    setResults(null); 
   };
 
 
@@ -148,6 +142,7 @@ export default function ShippingCalculatorForm() {
               <FormItem>
                 <FormLabel>Origem</FormLabel>
                 <FormControl>
+                  {/* O valor do campo de origem agora é dinâmico e usa `originCity` de `shipping-data.ts` */}
                   <Input value={originCity} readOnly className="bg-muted/50 cursor-not-allowed" />
                 </FormControl>
               </FormItem>
@@ -162,8 +157,8 @@ export default function ShippingCalculatorForm() {
                       onValueChange={(value) => {
                         handleDestinationChange(value);
                       }}
-                      defaultValue={field.value} // Ensures Radix Select default value works with react-hook-form
-                      value={field.value} // Controlled component
+                      defaultValue={field.value} 
+                      value={field.value} 
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -254,10 +249,11 @@ export default function ShippingCalculatorForm() {
       <MapDisplay
           originCoords={originMapCoords}
           destinationCoords={destinationMapCoords}
-          originCityName={originCity} // Passa o nome da cidade de origem
+          originCityName={originCity} // Passa o nome da cidade de origem atualizado
           destinationCityName={selectedDestCityName}
       />
-
     </>
   );
 }
+
+    

@@ -3,13 +3,13 @@
  * @fileOverview Lógica para cálculo de frete.
  */
 import { 
-    distancesFromRioLargo, 
+    distancesFromOrigin, 
     freeShippingRules, 
     shippingRatePerKm, 
     minShippingCost, 
     originCity,
     alagoasCityCoordinates, 
-    rioLargoCoordinates,     
+    vltOriginCoordinates,     
     type CityCoordinates    
 } from './shipping-data';
 
@@ -24,8 +24,9 @@ export interface ShippingCalculationOutput {
   error?: string;
   originCoords?: CityCoordinates;
   destinationCoords?: CityCoordinates;
+  originCityName?: string; // Adicionado para passar o nome da origem ao mapa
   destinationCityName?: string;
-  purchaseValue?: number; // Adicionado para exibir o total
+  purchaseValue?: number;
 }
 
 export function calculateShipping(input: ShippingCalculationInput): ShippingCalculationOutput {
@@ -35,21 +36,18 @@ export function calculateShipping(input: ShippingCalculationInput): ShippingCalc
     return { error: 'Selecione a cidade de destino!' };
   }
 
-  // Não permitir cálculo se origem e destino forem os mesmos,
-  // mas permitir que o mapa mostre a cidade de origem se for selecionada como destino (para preview)
-  // O erro de "cidades iguais" é mais para o cálculo final do frete.
-  // if (destinationCity === originCity) {
-  //   return { error: 'A cidade de origem e destino não podem ser a mesma para cálculo de frete.' };
-  // }
-
-  const distance = distancesFromRioLargo[destinationCity];
+  const distance = distancesFromOrigin[destinationCity];
   const destinationCoords = alagoasCityCoordinates[destinationCity];
 
-  // Se a cidade de destino for a mesma que a origem, retorne apenas as coordenadas para o mapa.
-  if (destinationCity === originCity) {
+  // Se a cidade de destino for a mesma que a origem nominal (VLT)
+  // No entanto, o nome da cidade de destino pode não ser exatamente igual a `originCity`
+  // Melhor seria uma verificação mais robusta se necessário, ou confiar que o usuário não selecionará a própria VLT como destino.
+  // Para o mapa, sempre forneceremos as coordenadas da VLT como origem.
+  if (destinationCity === originCity) { // Simplificando: se o nome selecionado for igual ao nome da origem
     return {
-      originCoords: rioLargoCoordinates,
-      destinationCoords: rioLargoCoordinates, // Mesmo ponto
+      originCoords: vltOriginCoordinates,
+      destinationCoords: vltOriginCoordinates, 
+      originCityName: originCity,
       destinationCityName: destinationCity,
       distanceKm: '0 km',
       shippingCost: 'N/A (Origem = Destino)',
@@ -58,22 +56,20 @@ export function calculateShipping(input: ShippingCalculationInput): ShippingCalc
   }
 
   if (typeof distance === 'undefined') {
-    // Pode acontecer se a cidade selecionada não estiver em `distancesFromRioLargo`
-    // mas estiver em `alagoasCityCoordinates` (usado para o Select)
     return { 
-        error: 'Rota não encontrada para o destino selecionado.',
-        originCoords: rioLargoCoordinates,
-        destinationCoords: destinationCoords, // Ainda mostra no mapa se tiver coords
+        error: 'Rota não encontrada para o destino selecionado. As distâncias de frete para este destino não foram pré-definidas.',
+        originCoords: vltOriginCoordinates,
+        destinationCoords: destinationCoords, 
+        originCityName: originCity,
         destinationCityName: destinationCity,
         purchaseValue: purchaseValue,
     };
   }
   if (!destinationCoords) {
-    // Isso não deve acontecer se destinationCities for derivado de alagoasCityCoordinates
-    // ou se a cidade estiver em distancesFromRioLargo (que implica que deveria ter coords)
     return { 
         error: 'Coordenadas não encontradas para a cidade de destino.',
-        originCoords: rioLargoCoordinates,
+        originCoords: vltOriginCoordinates,
+        originCityName: originCity,
         destinationCityName: destinationCity,
         purchaseValue: purchaseValue,
     };
@@ -99,9 +95,13 @@ export function calculateShipping(input: ShippingCalculationInput): ShippingCalc
   return {
     distanceKm: `${distance} km`,
     shippingCost: finalShippingCost,
-    originCoords: rioLargoCoordinates,
+    originCoords: vltOriginCoordinates,
     destinationCoords: destinationCoords,
+    originCityName: originCity,
     destinationCityName: destinationCity,
     purchaseValue: purchaseValue,
   };
 }
+
+
+    

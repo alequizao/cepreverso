@@ -1,7 +1,7 @@
 
 /**
  * @fileOverview Dados para cálculo de frete e coordenadas das cidades de Alagoas.
- * Contém distâncias de Rio Largo para outras cidades de Alagoas,
+ * Contém distâncias da origem para outras cidades de Alagoas,
  * as regras para frete grátis e coordenadas geográficas aproximadas.
  */
 
@@ -18,14 +18,15 @@ export interface CityGeoData {
   [city: string]: CityCoordinates;
 }
 
-// Coordenadas aproximadas para Rio Largo
-export const rioLargoCoordinates: CityCoordinates = { lat: -9.4835, lng: -35.8439 };
-export const originCity = 'Rio Largo';
+// Coordenadas para VLT Material de Construção
+export const vltOriginCoordinates: CityCoordinates = { lat: -9.5265467, lng: -35.7990566 };
+export const originCity = 'VLT Material de Construção (Rio Largo)';
 
 
-// Distâncias de Rio Largo para outras cidades de Alagoas (em km)
-// Estas são as distâncias que você forneceu.
-export const distancesFromRioLargo: CityDistance = {
+// Distâncias da ORIGEM (anteriormente Rio Largo, agora VLT Material de Construção) para outras cidades de Alagoas (em km)
+// ATENÇÃO: Estas distâncias foram fornecidas originalmente e são relativas a "Rio Largo" como um todo.
+// Para precisão a partir da VLT, estes valores precisariam ser recalculados e atualizados.
+export const distancesFromOrigin: CityDistance = {
   'Água Branca': 300,
   'Anadia': 90,
   'Arapiraca': 142,
@@ -72,7 +73,7 @@ export const distancesFromRioLargo: CityDistance = {
   'Junqueiro': 110,
   'Lagoa da Canoa': 135,
   'Limoeiro de Anadia': 120,
-  'Maceió': 24,
+  'Maceió': 24, // Distância de Rio Largo (cidade) para Maceió.
   'Major Isidoro': 200,
   'Mar Vermelho': 95,
   'Maragogi': 133,
@@ -216,6 +217,7 @@ export const alagoasCityCoordinates: CityGeoData = {
   'Porto de Pedras': { lat: -9.1602, lng: -35.2891 },
   'Porto Real do Colégio': { lat: -10.1861, lng: -36.8386 },
   'Quebrangulo': { lat: -9.3188, lng: -36.4736 },
+  'VLT Material de Construção (Rio Largo)': vltOriginCoordinates, // Adiciona a própria origem para consistência, se necessário
   'Roteiro': { lat: -9.8319, lng: -35.9697 },
   'Santa Luzia do Norte': { lat: -9.6008, lng: -35.8219 },
   'Santana do Ipanema': { lat: -9.3738, lng: -37.2436 },
@@ -257,4 +259,7 @@ export const shippingRatePerKm = 2.00; // R$ 2,00 por km
 export const minShippingCost = 50.00; // R$ 50,00 como frete mínimo
 
 
-export const destinationCities = Object.keys(distancesFromRioLargo).sort();
+export const destinationCities = Object.keys(distancesFromOrigin).sort();
+
+
+    
