@@ -8,9 +8,9 @@ import L from 'leaflet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MapPin } from 'lucide-react';
 
+// Fix for default icon path issues with bundlers like Webpack
 // @ts-ignore
 delete L.Icon.Default.prototype._getIconUrl;
-
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
@@ -48,7 +48,7 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
 
   // Effect to update the map view (zoom, center)
   React.useEffect(() => {
-    if (mapRef.current && isClient) { // Check if mapRef.current is not null and isClient is true
+    if (mapRef.current && isClient) { 
       const currentMap = mapRef.current;
       const positions: LatLngExpression[] = [];
       if (originCoords) {
@@ -66,7 +66,7 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
           if (bounds.isValid()) {
             currentMap.fitBounds(bounds, { padding: [50, 50] });
           } else {
-            // Fallback if bounds are not valid (e.g., same point, though unlikely with origin/dest)
+            // Fallback if bounds are not valid (e.g., same point)
             currentMap.setView(alagoasCenter, defaultZoom);
           }
         }
@@ -75,7 +75,7 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
           currentMap.setView(alagoasCenter, defaultZoom);
       }
     }
-  }, [originCoords, destinationCoords, isClient]);
+  }, [originCoords, destinationCoords, isClient]); // mapRef.current is not a state/prop, so not needed as dependency here.
 
   if (!isClient) {
     return (
@@ -105,14 +105,14 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
             {/* The key prop is crucial here to force a full remount when isClient becomes true,
                 ensuring a clean DOM node for Leaflet. */}
             <MapContainer
-                key={String(isClient)}
+                key={String(isClient)} 
                 center={alagoasCenter}
                 zoom={defaultZoom}
                 scrollWheelZoom={false}
                 style={{ height: '400px', width: '100%' }}
                 whenCreated={(mapInstance) => {
                     // Defensive check: if mapRef already holds an instance, remove it before assigning new.
-                    // This scenario should ideally be prevented by the `key` prop causing unmount/remount.
+                    // This is an important safeguard, especially with HMR or Strict Mode.
                     if (mapRef.current && mapRef.current !== mapInstance) {
                         mapRef.current.remove();
                     }
