@@ -5,6 +5,7 @@ import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import dynamic from 'next/dynamic'; // Import dynamic
 
 import { Button } from "@/components/ui/button";
 import {
@@ -27,12 +28,19 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Loader2, Truck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-import { originCity, destinationCities } from "@/lib/shipping-data";
+import { originCity, destinationCities, rioLargoCoordinates, type CityCoordinates } from "@/lib/shipping-data";
 import { calculateShipping, type ShippingCalculationInput, type ShippingCalculationOutput } from "@/lib/shipping-calculator";
+
+// Dynamic import for MapDisplay to ensure it only loads on client-side
+const MapDisplay = dynamic(() => import('./MapDisplay'), {
+  ssr: false,
+  loading: () => <div className="mt-8 p-4 text-center text-muted-foreground">Carregando mapa...</div>
+});
+
 
 const formSchema = z.object({
   destinationCity: z.string().min(1, { message: "Selecione a cidade de destino." }),
-  purchaseValue: z.coerce // Usa coerce para converter string do input para número
+  purchaseValue: z.coerce 
     .number({ invalid_type_error: "Valor da compra deve ser um número." })
     .positive({ message: "Valor da compra deve ser positivo." })
     .min(0.01, { message: "Valor da compra deve ser maior que zero." }),
@@ -45,24 +53,31 @@ export default function ShippingCalculatorForm() {
   const [results, setResults] = React.useState<ShippingCalculationOutput | null>(null);
   const { toast } = useToast();
 
+  // State for map coordinates
+  const [originMapCoords, setOriginMapCoords] = React.useState<CityCoordinates | undefined>(rioLargoCoordinates);
+  const [destinationMapCoords, setDestinationMapCoords] = React.useState<CityCoordinates | undefined>(undefined);
+  const [selectedDestCityName, setSelectedDestCityName] = React.useState<string | undefined>(undefined);
+
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       destinationCity: "",
-      purchaseValue: undefined, // Inicia como undefined para o placeholder funcionar
+      purchaseValue: undefined, 
     },
   });
 
   async function onSubmit(values: FormData) {
     setIsLoading(true);
-    setResults(null); // Limpa resultados anteriores
+    setResults(null); 
+    setDestinationMapCoords(undefined); // Clear previous map destination
+    setSelectedDestCityName(undefined);
 
     const calculationInput: ShippingCalculationInput = {
       destinationCity: values.destinationCity,
       purchaseValue: values.purchaseValue,
     };
 
-    // Simula uma pequena demora para mostrar o loader, pois o cálculo é rápido
     await new Promise(resolve => setTimeout(resolve, 300));
 
     const output = calculateShipping(calculationInput);
@@ -76,7 +91,11 @@ export default function ShippingCalculatorForm() {
       setResults(null);
     } else {
       setResults(output);
-      // Não precisa de toast de sucesso aqui, o resultado é exibido diretamente.
+      if (output.originCoords && output.destinationCoords) {
+        setOriginMapCoords(output.originCoords);
+        setDestinationMapCoords(output.destinationCoords);
+        setSelectedDestCityName(output.destinationCityName);
+      }
     }
 
     setIsLoading(false);
@@ -106,7 +125,16 @@ export default function ShippingCalculatorForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Destino</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        // Ao mudar o destino, limpamos os resultados e o mapa anterior
+                        setResults(null);
+                        setDestinationMapCoords(undefined);
+                        setSelectedDestCityName(undefined);
+                      }} 
+                      defaultValue={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione a cidade de destino" />
@@ -155,7 +183,7 @@ export default function ShippingCalculatorForm() {
                     Calculando...
                   </>
                 ) : (
-                  "Calcular Frete"
+                  "Calcular Frete e Ver Rota"
                 )}
               </Button>
             </CardFooter>
@@ -171,7 +199,7 @@ export default function ShippingCalculatorForm() {
           <CardContent className="space-y-2 text-center">
             {results.distanceKm && (
               <p className="text-lg">
-                <strong>Distância:</strong> {results.distanceKm}
+                <strong>Distância (pré-definida):</strong> {results.distanceKm}
               </p>
             )}
             {results.shippingCost && (
@@ -182,6 +210,17 @@ export default function ShippingCalculatorForm() {
           </CardContent>
         </Card>
       )}
+      
+      {/* Renderiza o mapa se houver coordenadas de destino */}
+      {(destinationMapCoords || !form.formState.isValid && !form.formState.isSubmitted) && (
+        <MapDisplay 
+            originCoords={originMapCoords} 
+            destinationCoords={destinationMapCoords} 
+            originCityName={originCity}
+            destinationCityName={selectedDestCityName}
+        />
+      )}
+      
     </>
   );
 }

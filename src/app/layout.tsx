@@ -2,6 +2,7 @@ import type {Metadata} from 'next';
 import {Geist, Geist_Mono} from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
+import 'leaflet/dist/leaflet.css'; // Import Leaflet CSS
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -14,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Consultor de CEP',
-  description: 'Encontre CEPs a partir do endereço ou endereços a partir do CEP.',
+  title: 'Consultor de CEP e Frete',
+  description: 'Encontre CEPs, endereços ou calcule o frete para cidades de Alagoas com visualização no mapa.',
 };
 
 export default function RootLayout({

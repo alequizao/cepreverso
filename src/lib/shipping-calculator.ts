@@ -2,7 +2,16 @@
 /**
  * @fileOverview Lógica para cálculo de frete.
  */
-import { distancesFromRioLargo, freeShippingRules, shippingRatePerKm, minShippingCost, originCity } from './shipping-data';
+import { 
+    distancesFromRioLargo, 
+    freeShippingRules, 
+    shippingRatePerKm, 
+    minShippingCost, 
+    originCity,
+    alagoasCityCoordinates, // Importa as coordenadas
+    rioLargoCoordinates,     // Importa coordenadas de Rio Largo
+    type CityCoordinates    // Importa o tipo
+} from './shipping-data';
 
 export interface ShippingCalculationInput {
   destinationCity: string;
@@ -13,6 +22,9 @@ export interface ShippingCalculationOutput {
   distanceKm?: string;
   shippingCost?: string;
   error?: string;
+  originCoords?: CityCoordinates;
+  destinationCoords?: CityCoordinates;
+  destinationCityName?: string;
 }
 
 export function calculateShipping(input: ShippingCalculationInput): ShippingCalculationOutput {
@@ -23,19 +35,21 @@ export function calculateShipping(input: ShippingCalculationInput): ShippingCalc
   }
 
   if (destinationCity === originCity) {
-    // Embora a UI previna isso, é uma boa checagem.
     return { error: 'A cidade de origem e destino não podem ser a mesma para cálculo de frete.' };
   }
 
   const distance = distancesFromRioLargo[destinationCity];
+  const destinationCoords = alagoasCityCoordinates[destinationCity];
 
   if (typeof distance === 'undefined') {
     return { error: 'Rota não encontrada para o destino selecionado.' };
   }
+  if (!destinationCoords) {
+    // Isso não deve acontecer se destinationCities for derivado de alagoasCityCoordinates
+    return { error: 'Coordenadas não encontradas para a cidade de destino.'};
+  }
 
   let isFreeShipping = false;
-  // As regras devem ser aplicadas em ordem, geralmente da mais restritiva/menor distância para maior
-  // O array freeShippingRules já está ordenado por maxDistance.
   for (const rule of freeShippingRules) {
     if (distance <= rule.maxDistance && purchaseValue >= rule.minPurchaseValue) {
       isFreeShipping = true;
@@ -55,5 +69,8 @@ export function calculateShipping(input: ShippingCalculationInput): ShippingCalc
   return {
     distanceKm: `${distance} km`,
     shippingCost: finalShippingCost,
+    originCoords: rioLargoCoordinates,
+    destinationCoords: destinationCoords,
+    destinationCityName: destinationCity,
   };
 }
