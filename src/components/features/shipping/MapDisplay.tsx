@@ -2,11 +2,12 @@
 "use client";
 
 import * as React from 'react';
-import ReactMapGL, { Marker, Popup, Source, Layer, NavigationControl, FullscreenControl } from 'react-map-gl';
-import type { ViewState, LngLatLike } from 'react-map-gl';
+// Alterar a importação para usar o entry point específico do maplibre
+import ReactMapGL, { Marker, Popup, Source, Layer, NavigationControl, FullscreenControl } from 'react-map-gl/maplibre';
+import type { ViewState, LngLatLike } from 'react-map-gl/maplibre';
 import maplibregl from 'maplibre-gl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MapPin, Maximize, Minimize } from 'lucide-react';
+import { MapPin } from 'lucide-react'; // Removido Maximize, Minimize pois não são usados
 
 interface MapDisplayProps {
   originCoords?: { lat: number; lng: number };
@@ -15,7 +16,7 @@ interface MapDisplayProps {
   originCityName?: string;
 }
 
-const alagoasCenter = { longitude: -36.7819, latitude: -9.5713 }; // Note: lng, lat for react-map-gl
+const alagoasCenter = { longitude: -36.7819, latitude: -9.5713 };
 const defaultZoom = 7;
 
 export default function MapDisplay({ originCoords, destinationCoords, destinationCityName, originCityName = "Rio Largo" }: MapDisplayProps) {
@@ -53,7 +54,6 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
           zoom: 10,
         }));
       } else if (points.length > 1) {
-        // Basic bounding box calculation - for more complex scenarios, a library like @turf/bbox might be used
         const longitudes = points.map(p => p[0]);
         const latitudes = points.map(p => p[1]);
         const minLng = Math.min(...longitudes);
@@ -61,16 +61,13 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
         const minLat = Math.min(...latitudes);
         const maxLat = Math.max(...latitudes);
 
-        // A simple way to fit bounds (react-map-gl has fitBounds but it can be tricky with async updates)
-        // This centers the map and adjusts zoom. More sophisticated fitting would require WebMercatorViewport.
         setViewport(prev => ({
           ...prev,
           longitude: (minLng + maxLng) / 2,
           latitude: (minLat + maxLat) / 2,
-          zoom: defaultZoom - 1 // Adjust zoom based on spread, this is a rough adjustment
+          // Ajuste de zoom simples; para um fitBounds mais preciso, seria necessário usar mapRef.current.fitBounds
+          zoom: Math.max(defaultZoom - 2, 5), // Evitar zoom muito distante
         }));
-         // For a proper fitBounds, you'd usually use mapRef.current?.fitBounds([[minLng, minLat], [maxLng, maxLat]], { padding: 40, duration: 1000 });
-         // However, getting mapRef reliably can be tricky with dynamic imports and SSR.
       } else {
          setViewport(prev => ({
           ...prev,
@@ -123,10 +120,15 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
         <div className="h-[400px] w-full rounded-md overflow-hidden">
           <ReactMapGL
             {...viewport}
-            mapLib={maplibregl}
+            mapLib={maplibregl} // Crucial para usar maplibre-gl
             style={{ width: '100%', height: '100%' }}
             onMove={evt => setViewport(evt.viewState)}
-            mapStyle="https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json" // Example open style
+            mapStyle="https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+            // Evitar controle de zoom com scroll do mouse se não desejado
+            // scrollZoom={false} 
+            // dragPan={true}
+            // dragRotate={false}
+            // doubleClickZoom={true}
           >
             <NavigationControl position="top-right" />
             <FullscreenControl position="top-right" />
@@ -210,3 +212,4 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
     </Card>
   );
 }
+
