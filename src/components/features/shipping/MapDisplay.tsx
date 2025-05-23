@@ -32,6 +32,11 @@ const defaultZoom = 8;
 
 export default function MapDisplay({ originCoords, destinationCoords, destinationCityName, originCityName = "Rio Largo" }: MapDisplayProps) {
   const [mapInstance, setMapInstance] = React.useState<L.Map | null>(null);
+  const [isClient, setIsClient] = React.useState(false); // State to track client-side mount
+
+  React.useEffect(() => {
+    setIsClient(true); // Set to true once component has mounted on the client
+  }, []);
 
   const positions: LatLngExpression[] = [];
   if (originCoords) {
@@ -42,20 +47,22 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
   }
 
   React.useEffect(() => {
-    if (mapInstance && positions.length > 0) {
+    // Ensure this effect only runs on the client and if mapInstance is available
+    if (isClient && mapInstance && positions.length > 0) {
       if (positions.length === 1) {
         mapInstance.setView(positions[0], 10); // Zoom maior se só tiver um ponto
       } else if (positions.length > 1) {
         const bounds = L.latLngBounds(positions);
         mapInstance.fitBounds(bounds, { padding: [50, 50] });
       }
-    } else if (mapInstance) {
+    } else if (isClient && mapInstance) {
         mapInstance.setView(alagoasCenter, defaultZoom);
     }
-  }, [originCoords, destinationCoords, mapInstance]);
+  }, [originCoords, destinationCoords, mapInstance, isClient]); // Add isClient to dependencies
 
 
-  if (typeof window === 'undefined') {
+  // Render placeholder if not on client or before client-side mount confirmation
+  if (!isClient) {
     return (
       <Card className="shadow-lg w-full mt-8">
         <CardHeader>
@@ -72,6 +79,7 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
     );
   }
 
+  // Render MapContainer only after client-side mount is confirmed
   return (
     <Card className="shadow-lg w-full mt-8">
         <CardHeader>
@@ -115,10 +123,3 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
     </Card>
   );
 }
-
-// Para evitar problemas com SSR, exportamos o componente dinamicamente
-// No entanto, para este caso, como o MapContainer lida bem com o client-side rendering,
-// podemos tentar sem o dynamic import primeiro. Se houver problemas de hidratação,
-// podemos reintroduzir o dynamic import.
-// import dynamic from 'next/dynamic';
-// export default dynamic(() => Promise.resolve(MapDisplay), { ssr: false });
