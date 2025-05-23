@@ -31,8 +31,10 @@ const alagoasCenter: LatLngExpression = [-9.5713, -36.7819];
 const defaultZoom = 8;
 
 export default function MapDisplay({ originCoords, destinationCoords, destinationCityName, originCityName = "Rio Largo" }: MapDisplayProps) {
-  const [mapInstance, setMapInstance] = React.useState<L.Map | null>(null);
+  const mapRef = React.useRef<L.Map | null>(null);
   const [isClient, setIsClient] = React.useState(false);
+  // This state helps trigger effects that depend on the map being ready
+  const [mapReady, setMapReady] = React.useState(false);
 
   React.useEffect(() => {
     setIsClient(true);
@@ -46,32 +48,38 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
     positions.push([destinationCoords.lat, destinationCoords.lng]);
   }
 
-  // Efeito para atualizar a visualização do mapa (zoom, centro)
+  // Effect to update the map view (zoom, center)
   React.useEffect(() => {
-    if (mapInstance) { 
+    if (mapRef.current && isClient && mapReady) {
+      const currentMap = mapRef.current;
       if (positions.length > 0) {
         if (positions.length === 1) {
-          mapInstance.setView(positions[0], 10); // Zoom um pouco maior para um único ponto
+          currentMap.setView(positions[0], 10); // Zoom um pouco maior para um único ponto
         } else if (positions.length > 1) {
           const bounds = L.latLngBounds(positions);
-          mapInstance.fitBounds(bounds, { padding: [50, 50] }); // Adiciona padding
+          currentMap.fitBounds(bounds, { padding: [50, 50] }); // Adiciona padding
         }
       } else {
-          mapInstance.setView(alagoasCenter, defaultZoom);
+          currentMap.setView(alagoasCenter, defaultZoom);
       }
     }
-  }, [originCoords, destinationCoords, mapInstance, positions]);
+  }, [originCoords, destinationCoords, isClient, mapReady, positions]); // positions is derived
 
-  // Efeito para limpar a instância do mapa ao desmontar o componente
-  // ou se a instância do mapa for explicitamente alterada.
+  // Effect for map instance cleanup when the MapDisplay component unmounts
   React.useEffect(() => {
-    const currentMap = mapInstance;
+    // This cleanup runs when the MapDisplay component unmounts.
     return () => {
-      if (currentMap) {
-        currentMap.remove();
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
       }
     };
-  }, [mapInstance]); 
+  }, []); // Empty dependency array ensures this runs only on unmount.
+
+  const handleMapCreated = React.useCallback((mapInstance: L.Map) => {
+    mapRef.current = mapInstance;
+    setMapReady(true); // Indicate that the map is ready for interactions
+  }, []);
 
 
   if (!isClient) {
@@ -99,13 +107,14 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
             </CardTitle>
         </CardHeader>
         <CardContent>
+            {/* The key prop is crucial here to force a full remount when isClient becomes true */}
             <MapContainer
                 key={String(isClient)} 
                 center={alagoasCenter}
                 zoom={defaultZoom}
                 scrollWheelZoom={false}
                 style={{ height: '400px', width: '100%' }}
-                whenCreated={setMapInstance}
+                whenCreated={handleMapCreated}
                 className="rounded-md"
             >
                 <TileLayer
@@ -140,4 +149,3 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
     </Card>
   );
 }
-
