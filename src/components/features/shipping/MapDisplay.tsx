@@ -7,7 +7,7 @@ import ReactMapGL, { Marker, Popup, Source, Layer, NavigationControl, Fullscreen
 import type { ViewState, LngLatLike } from 'react-map-gl/maplibre';
 import maplibregl from 'maplibre-gl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MapPin } from 'lucide-react'; // Removido Maximize, Minimize pois não são usados
+import { MapPin } from 'lucide-react';
 
 interface MapDisplayProps {
   originCoords?: { lat: number; lng: number };
@@ -61,13 +61,27 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
         const minLat = Math.min(...latitudes);
         const maxLat = Math.max(...latitudes);
 
-        setViewport(prev => ({
-          ...prev,
-          longitude: (minLng + maxLng) / 2,
-          latitude: (minLat + maxLat) / 2,
-          // Ajuste de zoom simples; para um fitBounds mais preciso, seria necessário usar mapRef.current.fitBounds
-          zoom: Math.max(defaultZoom - 2, 5), // Evitar zoom muito distante
-        }));
+        // A simple way to fit bounds, for more precise control, one might use map.fitBounds
+        // This calculation attempts to center the map and adjust zoom.
+        const map = (document.querySelector('.maplibregl-map') as any)?._map; // Access map instance if needed
+        if (map) {
+            // map.fitBounds([[minLng, minLat], [maxLng, maxLat]], { padding: 40, duration: 1000 });
+             setViewport(prev => ({
+                ...prev,
+                longitude: (minLng + maxLng) / 2,
+                latitude: (minLat + maxLat) / 2,
+                // Heuristic for zoom; actual fitBounds is better
+                zoom: Math.max(defaultZoom - Math.log2(Math.max(maxLng-minLng, maxLat-minLat) / 0.1), 5) 
+             }));
+
+        } else {
+            setViewport(prev => ({
+                ...prev,
+                longitude: (minLng + maxLng) / 2,
+                latitude: (minLat + maxLat) / 2,
+                zoom: Math.max(defaultZoom - 2, 5), 
+            }));
+        }
       } else {
          setViewport(prev => ({
           ...prev,
@@ -120,15 +134,10 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
         <div className="h-[400px] w-full rounded-md overflow-hidden">
           <ReactMapGL
             {...viewport}
-            mapLib={maplibregl} // Crucial para usar maplibre-gl
+            mapLib={maplibregl} 
             style={{ width: '100%', height: '100%' }}
             onMove={evt => setViewport(evt.viewState)}
             mapStyle="https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
-            // Evitar controle de zoom com scroll do mouse se não desejado
-            // scrollZoom={false} 
-            // dragPan={true}
-            // dragRotate={false}
-            // doubleClickZoom={true}
           >
             <NavigationControl position="top-right" />
             <FullscreenControl position="top-right" />
@@ -151,7 +160,7 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
                     anchor="top"
                     closeButton={false}
                     closeOnClick={false}
-                    offset={25}
+                    offset={25} // Adjust offset to position popup correctly above the marker pin
                  >
                     <div className="text-sm p-1 bg-background rounded-md shadow-md">{originCityName} (Origem)</div>
                  </Popup>
@@ -176,7 +185,7 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
                     anchor="top"
                     closeButton={false}
                     closeOnClick={false}
-                    offset={25}
+                    offset={25} // Adjust offset
                  >
                     <div className="text-sm p-1 bg-background rounded-md shadow-md">{destinationCityName} (Destino)</div>
                  </Popup>
@@ -189,7 +198,7 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
                   id="line-layer"
                   type="line"
                   paint={{
-                    'line-color': 'hsl(var(--primary))',
+                    'line-color': '#3F51B5', // Corrected: Use direct hex color value
                     'line-width': 3,
                     'line-dasharray': [2, 2]
                   }}
