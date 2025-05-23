@@ -11,7 +11,7 @@ export default function Home() {
         {/* Hero Section */}
         <header className="text-center pt-8 pb-4 md:pt-12 md:pb-8">
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-primary tracking-tight">
-            Consultas Inteligentes e Frete Descomplicado
+            Consultar Frete
           </h1>
           <p className="mt-4 md:mt-6 text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto">
             Sua plataforma completa para buscar CEPs, endereços e calcular fretes em Alagoas com precisão e agilidade.
@@ -20,14 +20,7 @@ export default function Home() {
 
         {/* Shipping Calculator Section - Prominent */}
         <section id="shipping-calculator" className="w-full scroll-mt-20" aria-labelledby="shipping-calculator-heading">
-          <div className="text-center mb-8 md:mb-12">
-            <h2 id="shipping-calculator-heading" className="text-3xl sm:text-4xl font-semibold text-foreground">
-              Calcule seu Frete e Visualize a Rota
-            </h2>
-            <p className="mt-2 text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
-              Informe a cidade de destino e o valor da compra para obter o custo do frete e ver o trajeto no mapa.
-            </p>
-          </div>
+          {/* Textos removidos conforme solicitado */}
           <ShippingCalculatorForm /> {/* This component renders its own card(s) */}
         </section>
 
