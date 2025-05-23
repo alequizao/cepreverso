@@ -48,35 +48,32 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
 
   // Efeito para atualizar a visualização do mapa (zoom, centro)
   React.useEffect(() => {
-    if (mapInstance) { // Somente se a instância do mapa existir
+    if (mapInstance) { 
       if (positions.length > 0) {
         if (positions.length === 1) {
-          mapInstance.setView(positions[0], 10);
+          mapInstance.setView(positions[0], 10); // Zoom um pouco maior para um único ponto
         } else if (positions.length > 1) {
           const bounds = L.latLngBounds(positions);
-          mapInstance.fitBounds(bounds, { padding: [50, 50] });
+          mapInstance.fitBounds(bounds, { padding: [50, 50] }); // Adiciona padding
         }
       } else {
           mapInstance.setView(alagoasCenter, defaultZoom);
       }
     }
-  }, [originCoords, destinationCoords, mapInstance, positions]); // Adicionado 'positions'
+  }, [originCoords, destinationCoords, mapInstance, positions]);
 
   // Efeito para limpar a instância do mapa ao desmontar o componente
   // ou se a instância do mapa for explicitamente alterada.
   React.useEffect(() => {
     const currentMap = mapInstance;
-    // Função de limpeza
     return () => {
       if (currentMap) {
-        // console.log("Removing map instance in cleanup effect:", currentMap);
         currentMap.remove();
       }
     };
-  }, [mapInstance]); // Executa a limpeza se mapInstance mudar ou ao desmontar
+  }, [mapInstance]); 
 
 
-  // Renderiza um placeholder se não estiver no cliente
   if (!isClient) {
     return (
       <Card className="shadow-lg w-full mt-8">
@@ -86,7 +83,7 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-96 w-full bg-muted rounded-md flex items-center justify-center"> {/* Aumentado o height para melhor visualização */}
+          <div className="h-96 w-full bg-muted rounded-md flex items-center justify-center">
             <p className="text-muted-foreground">Carregando mapa...</p>
           </div>
         </CardContent>
@@ -102,31 +99,27 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
             </CardTitle>
         </CardHeader>
         <CardContent>
-            {/* 
-              A prop 'key' força a remontagem do MapContainer quando 'isClient' muda de false para true.
-              Isso garante um DOM limpo para a inicialização do Leaflet.
-            */}
             <MapContainer
                 key={String(isClient)} 
                 center={alagoasCenter}
                 zoom={defaultZoom}
                 scrollWheelZoom={false}
                 style={{ height: '400px', width: '100%' }}
-                whenCreated={setMapInstance} // Define a instância do mapa no estado
+                whenCreated={setMapInstance}
                 className="rounded-md"
             >
                 <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
-                {originCoords && (
+                {originCoords && originCityName && (
                 <Marker position={[originCoords.lat, originCoords.lng]}>
                     <LeafletTooltip permanent>{originCityName}</LeafletTooltip>
                 </Marker>
                 )}
-                {destinationCoords && (
+                {destinationCoords && destinationCityName && (
                 <Marker position={[destinationCoords.lat, destinationCoords.lng]}>
-                    <LeafletTooltip permanent>{destinationCityName || 'Destino'}</LeafletTooltip>
+                    <LeafletTooltip permanent>{destinationCityName}</LeafletTooltip>
                 </Marker>
                 )}
                 {positions.length === 2 && (
@@ -135,7 +128,12 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
             </MapContainer>
             {positions.length === 2 && (
                 <p className="text-xs text-muted-foreground mt-2 text-center">
-                    Nota: A linha no mapa representa uma trajetória direta. A distância do frete é baseada em dados rodoviários pré-definidos.
+                    Nota: A linha no mapa representa uma trajetória direta. A distância do frete é baseada em dados rodoviários pré-definidos para as cidades.
+                </p>
+            )}
+            {(positions.length === 1 && originCityName) && (
+                 <p className="text-xs text-muted-foreground mt-2 text-center">
+                    Visualizando cidade de origem: {originCityName}. Selecione um destino para ver a rota.
                 </p>
             )}
         </CardContent>

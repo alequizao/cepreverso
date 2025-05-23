@@ -5,7 +5,7 @@ import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import dynamic from 'next/dynamic'; // Import dynamic
+import dynamic from 'next/dynamic'; 
 
 import { Button } from "@/components/ui/button";
 import {
@@ -31,10 +31,22 @@ import { useToast } from "@/hooks/use-toast";
 import { originCity, destinationCities, rioLargoCoordinates, type CityCoordinates } from "@/lib/shipping-data";
 import { calculateShipping, type ShippingCalculationInput, type ShippingCalculationOutput } from "@/lib/shipping-calculator";
 
-// Dynamic import for MapDisplay to ensure it only loads on client-side
 const MapDisplay = dynamic(() => import('./MapDisplay'), {
   ssr: false,
-  loading: () => <div className="mt-8 p-4 text-center text-muted-foreground">Carregando mapa...</div>
+  loading: () => (
+    <Card className="shadow-lg w-full mt-8">
+      <CardHeader>
+        <CardTitle className="text-xl text-primary flex items-center">
+          <Truck className="mr-2 h-5 w-5" /> Visualização no Mapa
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-96 w-full bg-muted rounded-md flex items-center justify-center">
+          <p className="text-muted-foreground">Carregando mapa...</p>
+        </div>
+      </CardContent>
+    </Card>
+  )
 });
 
 
@@ -53,7 +65,6 @@ export default function ShippingCalculatorForm() {
   const [results, setResults] = React.useState<ShippingCalculationOutput | null>(null);
   const { toast } = useToast();
 
-  // State for map coordinates
   const [originMapCoords, setOriginMapCoords] = React.useState<CityCoordinates | undefined>(rioLargoCoordinates);
   const [destinationMapCoords, setDestinationMapCoords] = React.useState<CityCoordinates | undefined>(undefined);
   const [selectedDestCityName, setSelectedDestCityName] = React.useState<string | undefined>(undefined);
@@ -69,20 +80,16 @@ export default function ShippingCalculatorForm() {
 
   async function onSubmit(values: FormData) {
     setIsLoading(true);
-    setResults(null);
-    // Do not clear destinationMapCoords here if you want the map to persist the last successful route
-    // until a new one is calculated or form changes significantly.
-    // For this fix, we'll let MapDisplay handle showing default or last state.
-    // setDestinationMapCoords(undefined);
-    // setSelectedDestCityName(undefined);
-
+    // Clear previous results, but keep map coords for immediate feedback
+    setResults(null); 
 
     const calculationInput: ShippingCalculationInput = {
       destinationCity: values.destinationCity,
       purchaseValue: values.purchaseValue,
     };
 
-    await new Promise(resolve => setTimeout(resolve, 300)); // Simulate API call
+    // Simulate API call or complex calculation
+    await new Promise(resolve => setTimeout(resolve, 300)); 
 
     const output = calculateShipping(calculationInput);
 
@@ -93,43 +100,37 @@ export default function ShippingCalculatorForm() {
         description: output.error,
       });
       setResults(null);
-      // Clear destination map coords on error to reset map if needed
-      setDestinationMapCoords(undefined);
-      setSelectedDestCityName(undefined);
+      // Optionally reset destination map coords on error, or keep them to show the problematic selection
+      // setDestinationMapCoords(undefined); 
+      // setSelectedDestCityName(undefined);
     } else {
       setResults(output);
-      if (output.originCoords && output.destinationCoords) {
-        setOriginMapCoords(output.originCoords); // Should be static Rio Largo
-        setDestinationMapCoords(output.destinationCoords);
-        setSelectedDestCityName(output.destinationCityName);
-      } else {
-        // If calculation is successful but somehow no coords, clear map
-        setDestinationMapCoords(undefined);
-        setSelectedDestCityName(undefined);
-      }
+      // Ensure map coordinates are updated based on the calculation output
+      // (though handleDestinationChange already does this for the selected city)
+      if (output.originCoords) setOriginMapCoords(output.originCoords);
+      if (output.destinationCoords) setDestinationMapCoords(output.destinationCoords);
+      if (output.destinationCityName) setSelectedDestCityName(output.destinationCityName);
     }
 
     setIsLoading(false);
   }
 
-  // Update map destination when the select input changes, before submission
-  const handleDestinationChange = (selectedCityName: string) => {
-    form.setValue('destinationCity', selectedCityName); // Update form state
-    const cityData = destinationCities.find(city => city === selectedCityName);
-    if (cityData) { // cityData is just the name, we need coords from shipping-data
-        const coords = calculateShipping({destinationCity: selectedCityName, purchaseValue: 0 /* dummy value */}).destinationCoords;
-        if (coords) {
-             setDestinationMapCoords(coords);
-             setSelectedDestCityName(selectedCityName);
-        } else {
-            setDestinationMapCoords(undefined);
-            setSelectedDestCityName(undefined);
-        }
+  const handleDestinationChange = (selectedCity: string) => {
+    form.setValue('destinationCity', selectedCity, { shouldValidate: true }); 
+    
+    // Attempt to get coordinates for the selected city for map preview
+    // We use a dummy purchaseValue here as it's not needed for coordinate lookup
+    const previewData = calculateShipping({ destinationCity: selectedCity, purchaseValue: 1 }); 
+
+    if (previewData.destinationCoords && previewData.destinationCityName) {
+        setDestinationMapCoords(previewData.destinationCoords);
+        setSelectedDestCityName(previewData.destinationCityName);
     } else {
+        // If city is not found or has no coords, clear destination from map
         setDestinationMapCoords(undefined);
         setSelectedDestCityName(undefined);
     }
-    setResults(null); // Clear previous calculation results
+    setResults(null); // Clear previous calculation results when destination changes
   };
 
 
@@ -147,7 +148,7 @@ export default function ShippingCalculatorForm() {
               <FormItem>
                 <FormLabel>Origem</FormLabel>
                 <FormControl>
-                  <Input value={originCity} readOnly className="bg-muted/50" />
+                  <Input value={originCity} readOnly className="bg-muted/50 cursor-not-allowed" />
                 </FormControl>
               </FormItem>
 
@@ -159,10 +160,10 @@ export default function ShippingCalculatorForm() {
                     <FormLabel>Destino</FormLabel>
                     <Select
                       onValueChange={(value) => {
-                        // field.onChange(value); // This is handled by handleDestinationChange
                         handleDestinationChange(value);
                       }}
-                      defaultValue={field.value}
+                      defaultValue={field.value} // Ensures Radix Select default value works with react-hook-form
+                      value={field.value} // Controlled component
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -194,7 +195,10 @@ export default function ShippingCalculatorForm() {
                         placeholder="Ex: 1000.00"
                         {...field}
                         value={(field.value === undefined || field.value === null || Number.isNaN(field.value as number)) ? '' : String(field.value)}
-                        onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                        onChange={e => {
+                            const val = e.target.value;
+                            field.onChange(val === '' ? undefined : parseFloat(val));
+                        }}
                         step="0.01"
                         min="0.01"
                       />
@@ -236,19 +240,24 @@ export default function ShippingCalculatorForm() {
                 <strong>Valor do Frete:</strong> <span className={results.shippingCost === 'FRETE GRÁTIS' ? 'text-green-600' : 'text-destructive'}>{results.shippingCost}</span>
               </p>
             )}
+            {results.shippingCost !== 'FRETE GRÁTIS' && results.purchaseValue && results.shippingCost &&
+              (() => {
+                  const cost = parseFloat(String(results.shippingCost).replace('R$ ', '').replace(',', '.'));
+                  const total = results.purchaseValue + cost;
+                  return <p className="text-md"><strong>Total (Compra + Frete):</strong> R$ {total.toFixed(2).replace('.', ',')}</p>
+              })()
+            }
           </CardContent>
         </Card>
       )}
 
-      {/* Always render MapDisplay; it will handle its internal state. */}
       <MapDisplay
           originCoords={originMapCoords}
           destinationCoords={destinationMapCoords}
-          originCityName={originCity}
+          originCityName={originCity} // Passa o nome da cidade de origem
           destinationCityName={selectedDestCityName}
       />
 
     </>
   );
 }
-
