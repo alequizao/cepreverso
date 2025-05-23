@@ -2,20 +2,11 @@
 "use client";
 
 import * as React from 'react';
-import { MapContainer, TileLayer, Marker, Polyline, Tooltip as LeafletTooltip } from 'react-leaflet';
-import type { LatLngExpression } from 'leaflet';
-import L from 'leaflet';
+import ReactMapGL, { Marker, Popup, Source, Layer, NavigationControl, FullscreenControl } from 'react-map-gl';
+import type { ViewState, LngLatLike } from 'react-map-gl';
+import maplibregl from 'maplibre-gl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MapPin } from 'lucide-react';
-
-// Fix for default icon path issues with bundlers like Webpack
-// @ts-ignore
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+import { MapPin, Maximize, Minimize } from 'lucide-react';
 
 interface MapDisplayProps {
   originCoords?: { lat: number; lng: number };
@@ -24,58 +15,72 @@ interface MapDisplayProps {
   originCityName?: string;
 }
 
-const alagoasCenter: LatLngExpression = [-9.5713, -36.7819];
-const defaultZoom = 8;
+const alagoasCenter = { longitude: -36.7819, latitude: -9.5713 }; // Note: lng, lat for react-map-gl
+const defaultZoom = 7;
 
 export default function MapDisplay({ originCoords, destinationCoords, destinationCityName, originCityName = "Rio Largo" }: MapDisplayProps) {
   const [isClient, setIsClient] = React.useState(false);
-  const mapRef = React.useRef<L.Map | null>(null);
+  const [viewport, setViewport] = React.useState<Partial<ViewState>>({
+    longitude: alagoasCenter.longitude,
+    latitude: alagoasCenter.latitude,
+    zoom: defaultZoom,
+    pitch: 0,
+    bearing: 0,
+  });
+
+  const [showOriginPopup, setShowOriginPopup] = React.useState(false);
+  const [showDestinationPopup, setShowDestinationPopup] = React.useState(false);
 
   React.useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Effect for map instance cleanup when the MapDisplay component unmounts.
-  // The `key` prop on MapContainer should trigger this unmount/remount cycle effectively.
   React.useEffect(() => {
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null; // Important to nullify the ref after removal
-      }
-    };
-  }, []); // Empty dependency array ensures this runs only on component unmount
-
-  // Effect to update the map view (zoom, center)
-  React.useEffect(() => {
-    if (mapRef.current && isClient) { 
-      const currentMap = mapRef.current;
-      const positions: LatLngExpression[] = [];
+    if (isClient) {
+      const points: LngLatLike[] = [];
       if (originCoords) {
-        positions.push([originCoords.lat, originCoords.lng]);
+        points.push([originCoords.lng, originCoords.lat]);
       }
       if (destinationCoords) {
-        positions.push([destinationCoords.lat, destinationCoords.lng]);
+        points.push([destinationCoords.lng, destinationCoords.lat]);
       }
 
-      if (positions.length > 0) {
-        if (positions.length === 1) {
-          currentMap.setView(positions[0], 10);
-        } else if (positions.length > 1) {
-          const bounds = L.latLngBounds(positions);
-          if (bounds.isValid()) {
-            currentMap.fitBounds(bounds, { padding: [50, 50] });
-          } else {
-            // Fallback if bounds are not valid (e.g., same point)
-            currentMap.setView(alagoasCenter, defaultZoom);
-          }
-        }
+      if (points.length === 1) {
+        setViewport(prev => ({
+          ...prev,
+          longitude: points[0][0],
+          latitude: points[0][1],
+          zoom: 10,
+        }));
+      } else if (points.length > 1) {
+        // Basic bounding box calculation - for more complex scenarios, a library like @turf/bbox might be used
+        const longitudes = points.map(p => p[0]);
+        const latitudes = points.map(p => p[1]);
+        const minLng = Math.min(...longitudes);
+        const maxLng = Math.max(...longitudes);
+        const minLat = Math.min(...latitudes);
+        const maxLat = Math.max(...latitudes);
+
+        // A simple way to fit bounds (react-map-gl has fitBounds but it can be tricky with async updates)
+        // This centers the map and adjusts zoom. More sophisticated fitting would require WebMercatorViewport.
+        setViewport(prev => ({
+          ...prev,
+          longitude: (minLng + maxLng) / 2,
+          latitude: (minLat + maxLat) / 2,
+          zoom: defaultZoom - 1 // Adjust zoom based on spread, this is a rough adjustment
+        }));
+         // For a proper fitBounds, you'd usually use mapRef.current?.fitBounds([[minLng, minLat], [maxLng, maxLat]], { padding: 40, duration: 1000 });
+         // However, getting mapRef reliably can be tricky with dynamic imports and SSR.
       } else {
-          // Default view if no coordinates are provided
-          currentMap.setView(alagoasCenter, defaultZoom);
+         setViewport(prev => ({
+          ...prev,
+          longitude: alagoasCenter.longitude,
+          latitude: alagoasCenter.latitude,
+          zoom: defaultZoom,
+        }));
       }
     }
-  }, [originCoords, destinationCoords, isClient]); // mapRef.current is not a state/prop, so not needed as dependency here.
+  }, [originCoords, destinationCoords, isClient]);
 
   if (!isClient) {
     return (
@@ -94,64 +99,114 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
     );
   }
 
+  const lineData: GeoJSON.Feature<GeoJSON.LineString> | null = 
+    originCoords && destinationCoords ? {
+    type: 'Feature',
+    geometry: {
+      type: 'LineString',
+      coordinates: [
+        [originCoords.lng, originCoords.lat],
+        [destinationCoords.lng, destinationCoords.lat],
+      ],
+    },
+    properties: {}
+  } : null;
+
   return (
     <Card className="shadow-lg w-full mt-8">
-        <CardHeader>
-            <CardTitle className="text-xl text-primary flex items-center">
-                <MapPin className="mr-2 h-5 w-5" /> Visualização no Mapa
-            </CardTitle>
-        </CardHeader>
-        <CardContent>
-            {/* The key prop is crucial here to force a full remount when isClient becomes true,
-                ensuring a clean DOM node for Leaflet. */}
-            <MapContainer
-                key={String(isClient)} 
-                center={alagoasCenter}
-                zoom={defaultZoom}
-                scrollWheelZoom={false}
-                style={{ height: '400px', width: '100%' }}
-                whenCreated={(mapInstance) => {
-                    // Defensive check: if mapRef already holds an instance, remove it before assigning new.
-                    // This is an important safeguard, especially with HMR or Strict Mode.
-                    if (mapRef.current && mapRef.current !== mapInstance) {
-                        mapRef.current.remove();
-                    }
-                    mapRef.current = mapInstance;
-                }}
-                className="rounded-md"
-            >
-                <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      <CardHeader>
+        <CardTitle className="text-xl text-primary flex items-center">
+          <MapPin className="mr-2 h-5 w-5" /> Visualização no Mapa
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[400px] w-full rounded-md overflow-hidden">
+          <ReactMapGL
+            {...viewport}
+            mapLib={maplibregl}
+            style={{ width: '100%', height: '100%' }}
+            onMove={evt => setViewport(evt.viewState)}
+            mapStyle="https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json" // Example open style
+          >
+            <NavigationControl position="top-right" />
+            <FullscreenControl position="top-right" />
+
+            {originCoords && originCityName && (
+              <Marker longitude={originCoords.lng} latitude={originCoords.lat} anchor="bottom">
+                <div 
+                  onMouseEnter={() => setShowOriginPopup(true)}
+                  onMouseLeave={() => setShowOriginPopup(false)}
+                  className="cursor-pointer"
+                >
+                  <MapPin className="h-8 w-8 text-red-500 fill-red-300" />
+                </div>
+              </Marker>
+            )}
+            {showOriginPopup && originCoords && originCityName && (
+                 <Popup
+                    longitude={originCoords.lng}
+                    latitude={originCoords.lat}
+                    anchor="top"
+                    closeButton={false}
+                    closeOnClick={false}
+                    offset={25}
+                 >
+                    <div className="text-sm p-1 bg-background rounded-md shadow-md">{originCityName} (Origem)</div>
+                 </Popup>
+            )}
+
+
+            {destinationCoords && destinationCityName && (
+              <Marker longitude={destinationCoords.lng} latitude={destinationCoords.lat} anchor="bottom">
+                 <div 
+                  onMouseEnter={() => setShowDestinationPopup(true)}
+                  onMouseLeave={() => setShowDestinationPopup(false)}
+                  className="cursor-pointer"
+                >
+                  <MapPin className="h-8 w-8 text-blue-500 fill-blue-300" />
+                </div>
+              </Marker>
+            )}
+            {showDestinationPopup && destinationCoords && destinationCityName && (
+                 <Popup
+                    longitude={destinationCoords.lng}
+                    latitude={destinationCoords.lat}
+                    anchor="top"
+                    closeButton={false}
+                    closeOnClick={false}
+                    offset={25}
+                 >
+                    <div className="text-sm p-1 bg-background rounded-md shadow-md">{destinationCityName} (Destino)</div>
+                 </Popup>
+            )}
+
+
+            {lineData && (
+              <Source id="route-line" type="geojson" data={lineData}>
+                <Layer
+                  id="line-layer"
+                  type="line"
+                  paint={{
+                    'line-color': 'hsl(var(--primary))',
+                    'line-width': 3,
+                    'line-dasharray': [2, 2]
+                  }}
                 />
-                {originCoords && originCityName && (
-                <Marker position={[originCoords.lat, originCoords.lng]}>
-                    <LeafletTooltip permanent>{originCityName}</LeafletTooltip>
-                </Marker>
-                )}
-                {destinationCoords && destinationCityName && (
-                <Marker position={[destinationCoords.lat, destinationCoords.lng]}>
-                    <LeafletTooltip permanent>{destinationCityName}</LeafletTooltip>
-                </Marker>
-                )}
-                {originCoords && destinationCoords && (
-                    <Polyline
-                        pathOptions={{ color: 'hsl(var(--primary))', weight: 5 }}
-                        positions={[[originCoords.lat, originCoords.lng], [destinationCoords.lat, destinationCoords.lng]]}
-                    />
-                )}
-            </MapContainer>
-            {originCoords && destinationCoords && (
-                <p className="text-xs text-muted-foreground mt-2 text-center">
-                    Nota: A linha no mapa representa uma trajetória direta. A distância do frete é baseada em dados rodoviários pré-definidos para as cidades.
-                </p>
+              </Source>
             )}
-            {(originCoords && !destinationCoords && originCityName) && (
-                 <p className="text-xs text-muted-foreground mt-2 text-center">
-                    Visualizando cidade de origem: {originCityName}. Selecione um destino para ver a rota.
-                </p>
-            )}
-        </CardContent>
+          </ReactMapGL>
+        </div>
+        {originCoords && destinationCoords && (
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            Nota: A linha no mapa representa uma trajetória direta. A distância do frete é baseada em dados rodoviários pré-definidos para as cidades.
+          </p>
+        )}
+        {(originCoords && !destinationCoords && originCityName) && (
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            Visualizando cidade de origem: {originCityName}. Selecione um destino para ver a rota.
+          </p>
+        )}
+      </CardContent>
     </Card>
   );
 }

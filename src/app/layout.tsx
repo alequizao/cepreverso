@@ -2,7 +2,7 @@ import type {Metadata} from 'next';
 import {Geist, Geist_Mono} from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import 'leaflet/dist/leaflet.css'; // Import Leaflet CSS
+import 'maplibre-gl/dist/maplibre-gl.css'; // Import MapLibre GL JS CSS
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
