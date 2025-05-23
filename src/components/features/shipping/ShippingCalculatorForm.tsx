@@ -132,13 +132,14 @@ export default function ShippingCalculatorForm() {
                   <FormItem>
                     <FormLabel>Valor da Compra (R$)</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        placeholder="Ex: 1000.00" 
-                        {...field} 
+                      <Input
+                        type="number"
+                        placeholder="Ex: 1000.00"
+                        {...field}
+                        value={(field.value === undefined || field.value === null || Number.isNaN(field.value as number)) ? '' : String(field.value)}
+                        onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
                         step="0.01"
                         min="0.01"
-                        onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
                       />
                     </FormControl>
                     <FormMessage />
