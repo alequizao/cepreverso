@@ -16,26 +16,26 @@ export default function Home() {
           </p>
         </header>
 
-        <Tabs defaultValue="addressToCep" className="w-full">
+        <Tabs defaultValue="shipping" className="w-full"> {/* Alterado defaultValue para "shipping" */}
           <TabsList className="grid w-full grid-cols-3 mb-6"> {/* Ajusta para 3 colunas */}
+            <TabsTrigger value="shipping"> {/* Nova aba de Frete */}
+              <Truck className="mr-2 h-4 w-4" /> Calcular Frete
+            </TabsTrigger>
             <TabsTrigger value="addressToCep">
               <MapPin className="mr-2 h-4 w-4" /> Endereço para CEP
             </TabsTrigger>
             <TabsTrigger value="cepToAddress">
               <Search className="mr-2 h-4 w-4" /> CEP para Endereço
             </TabsTrigger>
-            <TabsTrigger value="shipping"> {/* Nova aba de Frete */}
-              <Truck className="mr-2 h-4 w-4" /> Calcular Frete
-            </TabsTrigger>
           </TabsList>
+          <TabsContent value="shipping"> {/* Conteúdo da nova aba de Frete */}
+            <ShippingCalculatorForm />
+          </TabsContent>
           <TabsContent value="addressToCep">
             <AddressForm />
           </TabsContent>
           <TabsContent value="cepToAddress">
             <CEPForm />
-          </TabsContent>
-          <TabsContent value="shipping"> {/* Conteúdo da nova aba de Frete */}
-            <ShippingCalculatorForm />
           </TabsContent>
         </Tabs>
       </div>
