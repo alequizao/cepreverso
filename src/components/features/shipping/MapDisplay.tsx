@@ -24,7 +24,7 @@ interface MapDisplayProps {
   originCityName?: string;
 }
 
-const alagoasCenter: LatLngExpression = [-9.5713, -36.7819]; 
+const alagoasCenter: LatLngExpression = [-9.5713, -36.7819];
 const defaultZoom = 8;
 
 export default function MapDisplay({ originCoords, destinationCoords, destinationCityName, originCityName = "Rio Largo" }: MapDisplayProps) {
@@ -35,20 +35,20 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
     setIsClient(true);
   }, []);
 
-  // Effect for map instance cleanup when the MapDisplay component unmounts
-  // The `key` prop on MapContainer should trigger this unmount/remount cycle effectively
+  // Effect for map instance cleanup when the MapDisplay component unmounts.
+  // The `key` prop on MapContainer should trigger this unmount/remount cycle effectively.
   React.useEffect(() => {
     return () => {
       if (mapRef.current) {
         mapRef.current.remove();
-        mapRef.current = null;
+        mapRef.current = null; // Important to nullify the ref after removal
       }
     };
   }, []); // Empty dependency array ensures this runs only on component unmount
 
   // Effect to update the map view (zoom, center)
   React.useEffect(() => {
-    if (mapRef.current && isClient) {
+    if (mapRef.current && isClient) { // Check if mapRef.current is not null and isClient is true
       const currentMap = mapRef.current;
       const positions: LatLngExpression[] = [];
       if (originCoords) {
@@ -60,20 +60,22 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
 
       if (positions.length > 0) {
         if (positions.length === 1) {
-          currentMap.setView(positions[0], 10); 
+          currentMap.setView(positions[0], 10);
         } else if (positions.length > 1) {
           const bounds = L.latLngBounds(positions);
           if (bounds.isValid()) {
             currentMap.fitBounds(bounds, { padding: [50, 50] });
           } else {
-            currentMap.setView(alagoasCenter, defaultZoom); // Fallback
+            // Fallback if bounds are not valid (e.g., same point, though unlikely with origin/dest)
+            currentMap.setView(alagoasCenter, defaultZoom);
           }
         }
       } else {
+          // Default view if no coordinates are provided
           currentMap.setView(alagoasCenter, defaultZoom);
       }
     }
-  }, [originCoords, destinationCoords, isClient]); // isClient ensures mapRef.current could be set
+  }, [originCoords, destinationCoords, isClient]);
 
   if (!isClient) {
     return (
@@ -100,14 +102,20 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
             </CardTitle>
         </CardHeader>
         <CardContent>
-            {/* The key prop is crucial here to force a full remount when isClient becomes true */}
+            {/* The key prop is crucial here to force a full remount when isClient becomes true,
+                ensuring a clean DOM node for Leaflet. */}
             <MapContainer
-                key={String(isClient)} 
+                key={String(isClient)}
                 center={alagoasCenter}
                 zoom={defaultZoom}
                 scrollWheelZoom={false}
                 style={{ height: '400px', width: '100%' }}
                 whenCreated={(mapInstance) => {
+                    // Defensive check: if mapRef already holds an instance, remove it before assigning new.
+                    // This scenario should ideally be prevented by the `key` prop causing unmount/remount.
+                    if (mapRef.current && mapRef.current !== mapInstance) {
+                        mapRef.current.remove();
+                    }
                     mapRef.current = mapInstance;
                 }}
                 className="rounded-md"
@@ -127,9 +135,9 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
                 </Marker>
                 )}
                 {originCoords && destinationCoords && (
-                    <Polyline 
-                        pathOptions={{ color: 'hsl(var(--primary))', weight: 5 }} 
-                        positions={[[originCoords.lat, originCoords.lng], [destinationCoords.lat, destinationCoords.lng]]} 
+                    <Polyline
+                        pathOptions={{ color: 'hsl(var(--primary))', weight: 5 }}
+                        positions={[[originCoords.lat, originCoords.lng], [destinationCoords.lat, destinationCoords.lng]]}
                     />
                 )}
             </MapContainer>
