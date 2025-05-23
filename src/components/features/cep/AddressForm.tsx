@@ -16,14 +16,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import { reverseCEPSearch, type ReverseCEPSearchOutput } from "@/ai/flows/reverse-cep-search";
+import { reverseCEPSearch, type ReverseCEPSearchOutput, type ReverseCEPSearchInput } from "@/ai/flows/reverse-cep-search";
 import ResultsTable from "./ResultsTable";
 import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
-  streetName: z.string().min(1, { message: "Nome da rua é obrigatório." }),
-  neighborhood: z.string().min(1, { message: "Bairro é obrigatório." }),
+  streetName: z.string().min(3, { message: "Nome da rua deve ter pelo menos 3 caracteres." }),
+  neighborhood: z.string().optional(), // Neighborhood is optional as ViaCEP might not use it directly for street search
   city: z.string().min(1, { message: "Cidade é obrigatória." }),
+  uf: z.string().length(2, { message: "UF deve ter 2 caracteres." }).regex(/^[A-Za-z]+$/, { message: "UF deve conter apenas letras."}),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -40,6 +41,7 @@ export default function AddressForm() {
       streetName: "",
       neighborhood: "",
       city: "",
+      uf: "",
     },
   });
 
@@ -48,17 +50,19 @@ export default function AddressForm() {
     setSearched(false);
     setResults(null);
     try {
-      const response = await reverseCEPSearch({
+      const searchInput: ReverseCEPSearchInput = {
         streetName: values.streetName,
-        neighborhood: values.neighborhood,
         city: values.city,
-      });
+        uf: values.uf.toUpperCase(),
+        // neighborhood is not part of ReverseCEPSearchInput for ViaCEP street search
+      };
+      const response = await reverseCEPSearch(searchInput);
       setResults(response);
       setSearched(true);
       if (response.length === 0) {
         toast({
           title: "Nenhum CEP encontrado",
-          description: "Não foram encontrados CEPs para o endereço fornecido.",
+          description: "Não foram encontrados CEPs para o endereço e UF fornecidos.",
         });
       }
     } catch (error) {
@@ -66,9 +70,9 @@ export default function AddressForm() {
       toast({
         variant: "destructive",
         title: "Erro na busca",
-        description: "Ocorreu um erro ao buscar os CEPs. Tente novamente.",
+        description: "Ocorreu um erro ao buscar os CEPs. Verifique os dados e tente novamente.",
       });
-      setSearched(true); // Mark as searched even on error to potentially show a message
+      setSearched(true); 
     } finally {
       setIsLoading(false);
     }
@@ -90,7 +94,7 @@ export default function AddressForm() {
                   <FormItem>
                     <FormLabel>Nome da Rua</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ex: Rua das Palmeiras" {...field} />
+                      <Input placeholder="Ex: Rua das Palmeiras (mín. 3 caracteres)" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -101,7 +105,7 @@ export default function AddressForm() {
                 name="neighborhood"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Bairro</FormLabel>
+                    <FormLabel>Bairro (Opcional)</FormLabel>
                     <FormControl>
                       <Input placeholder="Ex: Centro" {...field} />
                     </FormControl>
@@ -109,19 +113,34 @@ export default function AddressForm() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="city"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cidade</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: São Paulo" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel>Cidade</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: São Paulo" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="uf"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>UF</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: SP" {...field} maxLength={2} onChange={(e) => field.onChange(e.target.value.toUpperCase())} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </CardContent>
             <CardFooter>
               <Button type="submit" disabled={isLoading} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
@@ -150,7 +169,7 @@ export default function AddressForm() {
                 <CardTitle className="text-xl text-primary">Resultados</CardTitle>
             </CardHeader>
             <CardContent>
-                <p className="text-center text-muted-foreground py-8">Nenhum CEP encontrado para o endereço fornecido.</p>
+                <p className="text-center text-muted-foreground py-8">Nenhum CEP encontrado para o endereço e UF fornecidos.</p>
             </CardContent>
          </Card>
       )}

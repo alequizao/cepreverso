@@ -7,7 +7,7 @@ export default function Home() {
         <header className="mb-8 text-center">
           <h1 className="text-4xl font-bold text-primary">CEP Reverso</h1>
           <p className="text-muted-foreground mt-2 text-lg">
-            Digite o nome da rua, bairro e cidade para encontrar os CEPs correspondentes.
+            Digite o nome da rua, cidade e UF para encontrar os CEPs correspondentes.
           </p>
         </header>
         <AddressForm />
