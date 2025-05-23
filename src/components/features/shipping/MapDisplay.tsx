@@ -4,11 +4,10 @@
 import * as React from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, Tooltip as LeafletTooltip } from 'react-leaflet';
 import type { LatLngExpression } from 'leaflet';
-import L from 'leaflet'; // Import L para usar L.icon
+import L from 'leaflet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MapPin } from 'lucide-react';
 
-// Corrige o problema comum com os ícones do marcador padrão do Leaflet no Next.js/Webpack
 // @ts-ignore
 delete L.Icon.Default.prototype._getIconUrl;
 
@@ -18,7 +17,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-
 interface MapDisplayProps {
   originCoords?: { lat: number; lng: number };
   destinationCoords?: { lat: number; lng: number };
@@ -26,61 +24,56 @@ interface MapDisplayProps {
   originCityName?: string;
 }
 
-// Coordenadas aproximadas do centro de Alagoas para visualização inicial
 const alagoasCenter: LatLngExpression = [-9.5713, -36.7819]; 
 const defaultZoom = 8;
 
 export default function MapDisplay({ originCoords, destinationCoords, destinationCityName, originCityName = "Rio Largo" }: MapDisplayProps) {
-  const mapRef = React.useRef<L.Map | null>(null);
   const [isClient, setIsClient] = React.useState(false);
-  // This state helps trigger effects that depend on the map being ready
-  const [mapReady, setMapReady] = React.useState(false);
+  const mapRef = React.useRef<L.Map | null>(null);
 
   React.useEffect(() => {
     setIsClient(true);
   }, []);
 
-  const positions: LatLngExpression[] = [];
-  if (originCoords) {
-    positions.push([originCoords.lat, originCoords.lng]);
-  }
-  if (destinationCoords) {
-    positions.push([destinationCoords.lat, destinationCoords.lng]);
-  }
-
-  // Effect to update the map view (zoom, center)
-  React.useEffect(() => {
-    if (mapRef.current && isClient && mapReady) {
-      const currentMap = mapRef.current;
-      if (positions.length > 0) {
-        if (positions.length === 1) {
-          currentMap.setView(positions[0], 10); // Zoom um pouco maior para um único ponto
-        } else if (positions.length > 1) {
-          const bounds = L.latLngBounds(positions);
-          currentMap.fitBounds(bounds, { padding: [50, 50] }); // Adiciona padding
-        }
-      } else {
-          currentMap.setView(alagoasCenter, defaultZoom);
-      }
-    }
-  }, [originCoords, destinationCoords, isClient, mapReady, positions]); // positions is derived
-
   // Effect for map instance cleanup when the MapDisplay component unmounts
+  // The `key` prop on MapContainer should trigger this unmount/remount cycle effectively
   React.useEffect(() => {
-    // This cleanup runs when the MapDisplay component unmounts.
     return () => {
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
       }
     };
-  }, []); // Empty dependency array ensures this runs only on unmount.
+  }, []); // Empty dependency array ensures this runs only on component unmount
 
-  const handleMapCreated = React.useCallback((mapInstance: L.Map) => {
-    mapRef.current = mapInstance;
-    setMapReady(true); // Indicate that the map is ready for interactions
-  }, []);
+  // Effect to update the map view (zoom, center)
+  React.useEffect(() => {
+    if (mapRef.current && isClient) {
+      const currentMap = mapRef.current;
+      const positions: LatLngExpression[] = [];
+      if (originCoords) {
+        positions.push([originCoords.lat, originCoords.lng]);
+      }
+      if (destinationCoords) {
+        positions.push([destinationCoords.lat, destinationCoords.lng]);
+      }
 
+      if (positions.length > 0) {
+        if (positions.length === 1) {
+          currentMap.setView(positions[0], 10); 
+        } else if (positions.length > 1) {
+          const bounds = L.latLngBounds(positions);
+          if (bounds.isValid()) {
+            currentMap.fitBounds(bounds, { padding: [50, 50] });
+          } else {
+            currentMap.setView(alagoasCenter, defaultZoom); // Fallback
+          }
+        }
+      } else {
+          currentMap.setView(alagoasCenter, defaultZoom);
+      }
+    }
+  }, [originCoords, destinationCoords, isClient]); // isClient ensures mapRef.current could be set
 
   if (!isClient) {
     return (
@@ -91,7 +84,7 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-96 w-full bg-muted rounded-md flex items-center justify-center">
+          <div className="h-[400px] w-full bg-muted rounded-md flex items-center justify-center">
             <p className="text-muted-foreground">Carregando mapa...</p>
           </div>
         </CardContent>
@@ -114,7 +107,9 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
                 zoom={defaultZoom}
                 scrollWheelZoom={false}
                 style={{ height: '400px', width: '100%' }}
-                whenCreated={handleMapCreated}
+                whenCreated={(mapInstance) => {
+                    mapRef.current = mapInstance;
+                }}
                 className="rounded-md"
             >
                 <TileLayer
@@ -131,16 +126,19 @@ export default function MapDisplay({ originCoords, destinationCoords, destinatio
                     <LeafletTooltip permanent>{destinationCityName}</LeafletTooltip>
                 </Marker>
                 )}
-                {positions.length === 2 && (
-                    <Polyline pathOptions={{ color: 'hsl(var(--primary))', weight: 5 }} positions={positions} />
+                {originCoords && destinationCoords && (
+                    <Polyline 
+                        pathOptions={{ color: 'hsl(var(--primary))', weight: 5 }} 
+                        positions={[[originCoords.lat, originCoords.lng], [destinationCoords.lat, destinationCoords.lng]]} 
+                    />
                 )}
             </MapContainer>
-            {positions.length === 2 && (
+            {originCoords && destinationCoords && (
                 <p className="text-xs text-muted-foreground mt-2 text-center">
                     Nota: A linha no mapa representa uma trajetória direta. A distância do frete é baseada em dados rodoviários pré-definidos para as cidades.
                 </p>
             )}
-            {(positions.length === 1 && originCityName) && (
+            {(originCoords && !destinationCoords && originCityName) && (
                  <p className="text-xs text-muted-foreground mt-2 text-center">
                     Visualizando cidade de origem: {originCityName}. Selecione um destino para ver a rota.
                 </p>
