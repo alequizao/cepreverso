@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'CEP Reverso',
-  description: 'Encontre CEPs a partir do endereço usando IA.',
+  title: 'Consultor de CEP',
+  description: 'Encontre CEPs a partir do endereço ou endereços a partir do CEP.',
 };
 
 export default function RootLayout({
